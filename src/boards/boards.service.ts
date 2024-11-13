@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Board } from './board.entity';
@@ -12,11 +16,10 @@ export class BoardsService {
     @InjectRepository(Board)
     private boardsRepository: Repository<Board>,
     @InjectRepository(User)
-    private usersRepository: Repository<User>, // UserRepository 추가
+    private usersRepository: Repository<User>,
   ) {}
 
   async create(createBoardDto: CreateBoardDto, userId: number): Promise<Board> {
-    // 사용자 ID로 전체 User 엔티티 조회
     const completeUser = await this.usersRepository.findOne({
       where: { id: userId },
     });
@@ -25,12 +28,10 @@ export class BoardsService {
       throw new NotFoundException('User not found');
     }
 
-    // Board 생성
     const board = this.boardsRepository.create({
       ...createBoardDto,
       user: completeUser,
     });
-    console.log('Board to save:', board); // 완전한 User 엔티티로 설정된 Board 확인용 로그
     return this.boardsRepository.save(board);
   }
 
@@ -49,12 +50,31 @@ export class BoardsService {
     return board;
   }
 
-  async update(id: number, updateBoardDto: UpdateBoardDto): Promise<Board> {
+  async update(
+    id: number,
+    updateBoardDto: UpdateBoardDto,
+    userId: number,
+  ): Promise<Board> {
+    const board = await this.findOne(id);
+
+    // 작성자와 요청 사용자가 동일한지 확인
+    if (board.user.id !== userId) {
+      throw new ForbiddenException('You are not allowed to update this board');
+    }
+
     await this.boardsRepository.update(id, updateBoardDto);
     return this.findOne(id);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, userId: number): Promise<void> {
+    const board = await this.findOne(id);
+    console.log('board:', board);
+
+    // 작성자와 요청 사용자가 동일한지 확인
+    if (board.user.id !== userId) {
+      throw new ForbiddenException('You are not allowed to delete this board');
+    }
+
     const result = await this.boardsRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`Board with ID ${id} not found`);

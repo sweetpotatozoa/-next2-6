@@ -14,6 +14,9 @@ import { Board } from './board.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
+import { Roles } from 'src/common/decorator/role.decorator';
+import { RolesGuard } from 'src/common/guard/role.guard';
+import { AuthorGuard } from 'src/common/guard/author.guard'; // AuthorGuard 추가
 
 @Controller('boards')
 export class BoardsController {
@@ -41,18 +44,20 @@ export class BoardsController {
     return this.boardsService.findOne(id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), AuthorGuard) // AuthorGuard 추가
   @Patch(':id')
   async update(
     @Param('id') id: number,
     @Body() updateBoardDto: UpdateBoardDto,
+    @Request() req,
   ): Promise<Board> {
-    return this.boardsService.update(id, updateBoardDto);
+    return this.boardsService.update(id, updateBoardDto, req.user.userId); // userId 전달
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), AuthorGuard) // AuthorGuard만 적용
   @Delete(':id')
-  async remove(@Param('id') id: number): Promise<void> {
-    return this.boardsService.remove(id);
+  async remove(@Param('id') id: number, @Request() req): Promise<void> {
+    console.log('User from request:', req.user.userId); // 디버그용 로그
+    return this.boardsService.remove(id, req.user.userId); // userId 전달
   }
 }
